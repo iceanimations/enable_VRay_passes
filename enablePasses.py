@@ -26,80 +26,94 @@ class UI(Form, Base):
     def __init__(self, parent = utl.getMayaWindow()):
         super(UI, self).__init__(parent)
         self.setupUi(self)
-        self.passes = [] # list of passes as checkBox
-        self.f = QtGui.QFont("Arial", 10)
-        self.refresh()
-        self.refreshButton.clicked.connect(self.refresh)
+        self.elementButtons = [] # list of passes as checkBox
+        self.renderElements = {}
+        self.f = QtGui.QFont("Arial", 9)
+        self.listPasses()
+        self.refreshButton.released.connect(self.updateWindow)
+        self.refreshButton.hide()
+        self.thread = Thread(self)
+        self.thread.start()
 
-    def refresh(self):
+    def updateWindow(self):
         '''
         refreshes the list of passes in the GUI
         '''
-        # if GUI list already contain passes, remove them
-        if self.passes:
-            for p in self.passes:
-                p.deleteLater()
-            self.passes[:] = []
-        try:
-            # list existing passe(s) (VRayRenderElements) and their set(s)
-            passesList = pc.ls(type = ['VRayRenderElement', 'VRayRenderElementSet'])
-        except RuntimeError:
-            pc.warning('vray plugin is not loaded...')
-            return
-        if passesList:
-            self.listPasses(passesList)
-        else:
-            pc.warning('pass(es) not found...')
-            return
+        elements = pc.ls(type = ['VRayRenderElement', 'VRayRenderElementSet'])
+        newElements = {}
+        for element in elements:
+            newElements[element] = element.enabled.get()
+        if self.renderElements != newElements:
+            self.renderElements.clear()
+            for btn in self.elementButtons:
+                btn.hide()
+                btn.deleteLater()
+            self.elementButtons[:] = []
+            self.listPasses()
 
-    def listPasses(self, passesList):
+    def listPasses(self):
         '''
         lists all the passes as checkBox within scrollArea on the GUI
         '''
-        for passName in passesList:
-            # see if the 'pass.enable' is true or false
-            enabled = passName.enabled.get()
-            ps = QtGui.QCheckBox(str(passName), self)
-            ps.setFont(self.f)
-            self.passes.append(ps)
+        try:
+            # list existing passe(s) (VRayRenderElements) and their set(s)
+            elements = pc.ls(type = ['VRayRenderElement', 'VRayRenderElementSet'])
+            if not elements:
+                pc.warning('VRay elements not found...')
+                return
+        except RuntimeError:
+            pc.warning('VRay plugin is not loaded...')
+            return
+        for element in elements:
+            enabled = element.enabled.get()
+            self.renderElements[element] = enabled
+            elementButton = QtGui.QCheckBox(str(element), self)
+            style = "border-bottom: 1px solid black; padding-bottom: 4px"
+            elementButton.setStyleSheet(style)
+            elementButton.setFont(self.f)
+            self.elementButtons.append(elementButton)
             if enabled:
-                ps.setChecked(True)
-            self.passesLayout.addWidget(ps)
-            self.bindClickEvent(ps, self.setEnable, passesList)
+                elementButton.setChecked(True)
+            self.elementsLayout.addWidget(elementButton)
+        map(lambda btn: btn.clicked.connect(lambda: self.switchElement(btn)), self.elementButtons)
 
-    def bindClickEvent(self, btn, func, passesList):
-        '''
-        binds the click event with the checkBox and calls
-        self.setEnable when the user changes the state of checkBox
-        '''
-        btn.stateChanged.connect(lambda value: func( btn , passesList))
-
-    def setEnable(self, btn, passesList):
+    def switchElement(self, btn):
         '''
         sets the enable property of the pass according to the checkBox on GUI
         '''
-        text = btn.text()
-        for p in passesList:
-            if text == str(p):
+        text = str(btn.text())
+        for element in self.renderElements:
+            if text == str(element):
                 try:
                     # override the the enable property of pass
-                    pc.editRenderLayerAdjustment(p.enabled)
+                    pc.editRenderLayerAdjustment(element.enabled)
                 except RuntimeError:
-                    pc.warning('Default layer is selected...')
-                    return
+                    pass
                 break
-        def setEn(val):
-            try:
-                p.enabled.set(val)
-            except general.MayaNodeError:
-                pc.warning('Pass does not exists, refresh the list...')
-                return
         if btn.isChecked():
-            setEn(1)
+            self.setEnDis(element, 1)
         else:
-            setEn(0)
+            self.setEnDis(element, 0)
             
-class Thread(QThread):
+    def setEnDis(self, element, val):
+        try:
+            element.enabled.set(val)
+        except general.MayaNodeError:
+            pc.warning('VRay element does not exists...')
+            
+    def closeEvent(self, event):
+        self.thread.terminate()
+            
+class Thread(QtCore.QThread):
+    def __init__(self, parent = None):
+        super(Thread, self).__init__(parent)
+        self.parentWin = parent
+        
+    def run(self):
+        while True:
+            time.sleep(0.3)
+            self.parentWin.refreshButton.released.emit()
+        
         
 
 def main():

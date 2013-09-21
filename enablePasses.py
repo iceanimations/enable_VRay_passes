@@ -34,6 +34,11 @@ class UI(Form, Base):
         self.refreshButton.hide()
         self.thread = Thread(self)
         self.thread.start()
+        
+        # update the database, how many times this app is used
+        site.addsitedir(r'r:/pipe_repo/users/qurban')
+        import appUsageApp
+        appUsageApp.updateDatabase('enable_VRay_passes')
 
     def updateWindow(self):
         '''

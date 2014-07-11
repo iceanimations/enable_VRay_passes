@@ -11,17 +11,18 @@
 
 import pymel.core as pc
 import site
-site.addsitedir(r"R:/Python_Scripts")
-from plugins import utilities as utl
-import enablePasses
-reload(enablePasses)
-#import plugins.utilities as utl
+site.addsitedir(r"R:/Pipi_Repo/Users/Qurban/Utilities")
+import qtify_maya_window as utl
+try:
+    from uiContainer import uic
+except:
+    from PyQt4 import uic
 import PyQt4
-from PyQt4 import QtGui, QtCore, uic
+from PyQt4 import QtGui, QtCore
 import os.path as osp
 import time
 
-Form, Base = uic.loadUiType(r"%s\ui\ui.ui"%osp.dirname(enablePasses.__file__))
+Form, Base = uic.loadUiType(r"%s\ui\ui.ui"%osp.dirname(__file__))
 class UI(Form, Base):
     def __init__(self, parent = utl.getMayaWindow()):
         super(UI, self).__init__(parent)

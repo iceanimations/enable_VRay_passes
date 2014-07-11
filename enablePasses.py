@@ -108,6 +108,10 @@ class UI(Form, Base):
             
     def closeEvent(self, event):
         self.thread.terminate()
+        self.deleteLater()
+        
+    def hideEvent(self, event):
+        self.close()
             
 class Thread(QtCore.QThread):
     def __init__(self, parent = None):
